@@ -15,6 +15,7 @@ export interface PeerDot {
   lat: number;
   lng: number;
   busy: boolean;
+  vibe: string | null; // curated vibe key (see lib/vibes), or null
 }
 
 export interface SignalMsg {

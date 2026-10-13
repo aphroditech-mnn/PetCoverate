@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { applyPrivacyOffset, isValidLatLng } from "@/lib/geo";
 import { isValidId } from "@/lib/validate";
+import { isValidVibe } from "@/lib/vibes";
 import { createSession } from "@/lib/session";
 import { rateLimit, clientIp } from "@/lib/ratelimit";
 
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "invalid body" }, { status: 400 });
   }
 
-  const { id, lat, lng } = (body ?? {}) as Record<string, unknown>;
+  const { id, lat, lng, vibe } = (body ?? {}) as Record<string, unknown>;
 
   if (!isValidId(id)) {
     return Response.json({ error: "invalid id" }, { status: 400 });
@@ -32,6 +33,11 @@ export async function POST(request: NextRequest) {
   if (!isValidLatLng(lat, lng)) {
     return Response.json({ error: "invalid coordinates" }, { status: 400 });
   }
+  // Vibe is optional, but if present it must be one of the curated keys.
+  if (vibe !== null && vibe !== undefined && !isValidVibe(vibe)) {
+    return Response.json({ error: "invalid vibe" }, { status: 400 });
+  }
+  const vibeValue = isValidVibe(vibe) ? vibe : null;
 
   const offset = applyPrivacyOffset(lat as number, lng as number);
   const { tokenHash, setCookie } = createSession(id as string);
@@ -45,6 +51,7 @@ export async function POST(request: NextRequest) {
       busy: false,
       lastSeen: new Date(),
       tokenHash,
+      vibe: vibeValue,
     },
     // Re-entering is a fresh session: new secret, and clear any stuck busy flag.
     update: {
@@ -53,6 +60,7 @@ export async function POST(request: NextRequest) {
       lastSeen: new Date(),
       busy: false,
       tokenHash,
+      vibe: vibeValue,
     },
   });
 

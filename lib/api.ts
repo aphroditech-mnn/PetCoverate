@@ -5,11 +5,12 @@ export async function join(
   id: string,
   lat: number,
   lng: number,
+  vibe?: string | null,
 ): Promise<void> {
   await fetch("/api/join", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id, lat, lng }),
+    body: JSON.stringify({ id, lat, lng, vibe: vibe ?? null }),
   });
 }
 
