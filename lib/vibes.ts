@@ -31,6 +31,3 @@ export function isValidVibe(v: unknown): v is string {
 export function vibeByKey(key: string | null | undefined): Vibe | undefined {
   return key ? BY_KEY.get(key) : undefined;
 }
-
-// Neutral colour for dots with no vibe set.
-export const NEUTRAL_DOT = "#9aa7d0";

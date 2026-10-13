@@ -172,6 +172,7 @@ body {
    Each dot gets its hue via the inline `--dot` custom property. */
 .pulse-dot {
   --dot: #8b8bff;
+  position: relative; /* positioning context for the ::after sonar ring */
   width: 16px;
   height: 16px;
   border-radius: 9999px;
@@ -179,6 +180,12 @@ body {
   padding: 0;
   cursor: pointer;
   background: radial-gradient(circle at 35% 30%, #fff, var(--dot) 65%);
+  /* Fallback glow (solid colour) for engines without color-mix(); the richer,
+     translucent glow below overrides it where color-mix is supported. */
+  box-shadow:
+    0 0 0 1.5px rgba(255, 255, 255, 0.55),
+    0 0 10px 2px var(--dot),
+    0 0 22px 6px var(--dot);
   box-shadow:
     0 0 0 1.5px rgba(255, 255, 255, 0.55),
     0 0 10px 2px color-mix(in srgb, var(--dot) 85%, transparent),
@@ -194,6 +201,7 @@ body {
   height: 16px;
   margin: -8px 0 0 -8px;
   border-radius: 9999px;
+  border: 1.5px solid var(--dot); /* fallback */
   border: 1.5px solid color-mix(in srgb, var(--dot) 80%, transparent);
   animation: sonar 2.6s ease-out infinite;
 }
@@ -215,7 +223,10 @@ body {
 .pulse-dot.dimmed {
   opacity: 0.16;
   filter: saturate(0.3);
-  transition: opacity 0.3s ease, filter 0.3s ease;
+  transition:
+    opacity 0.3s ease,
+    filter 0.3s ease,
+    transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .pulse-dot.dimmed::after {
   animation: none;
