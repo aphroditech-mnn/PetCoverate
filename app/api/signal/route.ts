@@ -68,11 +68,20 @@ export async function POST(request: NextRequest) {
   }
   const payloadStr = typeof payload === "string" ? payload : null;
 
-  // The target must be a real, online user.
   const target = await prisma.presence.findUnique({
     where: { id: toId },
     select: { busy: true },
   });
+
+  // Free both peers on hang-up FIRST — before any "peer is gone" short-circuit —
+  // so ending a call always frees the sender even if the other side vanished
+  // without a clean leave (e.g. a network drop → RTCPeerConnection "failed").
+  if (signalType === "decline" || signalType === "end") {
+    await prisma.presence.updateMany({
+      where: { id: { in: [fromId, toId] } },
+      data: { busy: false },
+    });
+  }
 
   if (signalType === "request") {
     // Enforce "one active connection at a time": if the target is gone or busy,
@@ -82,29 +91,22 @@ export async function POST(request: NextRequest) {
       return Response.json({ ok: true, autoDeclined: true });
     }
   } else if (!target) {
-    // Peer vanished mid-handshake — nothing to deliver, and don't leave orphans.
+    // Peer vanished — nothing to deliver (sender already freed above if needed).
     return Response.json({ ok: true, delivered: false });
+  }
+
+  // accept: the connection is now active → mark BOTH peers busy.
+  if (signalType === "accept") {
+    await prisma.presence.updateMany({
+      where: { id: { in: [fromId, toId] } },
+      data: { busy: true },
+    });
   }
 
   // Anti-flood: refuse to pile onto a full mailbox.
   const pending = await prisma.signal.count({ where: { toId } });
   if (pending >= MAILBOX_CAP) {
     return Response.json({ error: "recipient mailbox full" }, { status: 429 });
-  }
-
-  // Busy transitions:
-  // - accept: the connection is now active → mark BOTH peers busy.
-  // - decline/end: free both peers.
-  if (signalType === "accept") {
-    await prisma.presence.updateMany({
-      where: { id: { in: [fromId, toId] } },
-      data: { busy: true },
-    });
-  } else if (signalType === "decline" || signalType === "end") {
-    await prisma.presence.updateMany({
-      where: { id: { in: [fromId, toId] } },
-      data: { busy: false },
-    });
   }
 
   await prisma.signal.create({
