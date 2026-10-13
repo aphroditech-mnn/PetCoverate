@@ -59,6 +59,10 @@ export default function Home() {
   useEffect(() => {
     locationRef.current = myLocation;
   }, [myLocation]);
+  const vibeRef = useRef(myVibe);
+  useEffect(() => {
+    vibeRef.current = myVibe;
+  }, [myVibe]);
 
   function showNotice(text: string) {
     setNotice(text);
@@ -301,6 +305,7 @@ export default function Home() {
               sessionId,
               locationRef.current.lat,
               locationRef.current.lng,
+              vibeRef.current, // keep the user's vibe across a reconnect
             );
           } catch {}
         }

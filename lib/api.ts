@@ -1,4 +1,8 @@
 // Client-side helpers for talking to the coordination API.
+//
+// Every call is same-origin, so the httpOnly session cookie rides along by
+// default — but we set `credentials: "same-origin"` explicitly so the auth
+// contract is obvious and immune to any future default change.
 import type { PollResponse, SignalType } from "@/lib/types";
 
 export async function join(
@@ -9,6 +13,7 @@ export async function join(
 ): Promise<void> {
   await fetch("/api/join", {
     method: "POST",
+    credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id, lat, lng, vibe: vibe ?? null }),
   });
@@ -25,7 +30,10 @@ export class SessionExpiredError extends Error {
 }
 
 export async function poll(): Promise<PollResponse> {
-  const res = await fetch("/api/poll", { cache: "no-store" });
+  const res = await fetch("/api/poll", {
+    cache: "no-store",
+    credentials: "same-origin",
+  });
   if (res.status === 401) throw new SessionExpiredError();
   if (!res.ok) throw new Error(`poll failed: ${res.status}`);
   return res.json();
@@ -39,6 +47,7 @@ export async function sendSignal(
 ): Promise<void> {
   await fetch("/api/signal", {
     method: "POST",
+    credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ fromId, toId, type, payload }),
   });
@@ -54,6 +63,7 @@ export function leave(id: string, peerId?: string): void {
   } else {
     void fetch("/api/leave", {
       method: "POST",
+      credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
       body,
       keepalive: true,
