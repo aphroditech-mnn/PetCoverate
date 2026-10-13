@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "motion/react";
 
 export default function EntryGate({
   onReady,
@@ -33,31 +34,111 @@ export default function EntryGate({
     );
   }
 
-  return (
-    <div className="flex min-h-full flex-1 flex-col items-center justify-center gap-8 bg-zinc-950 p-6 text-zinc-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold tracking-tight">Pulse</h1>
-        <p className="mt-2 max-w-sm text-zinc-400">
-          A living globe of anonymous strangers. Drop onto the map and connect.
-        </p>
-      </div>
+  const locating = status === "locating";
 
-      <button
-        onClick={enter}
-        disabled={status === "locating"}
-        className="rounded-full bg-emerald-400 px-8 py-3 font-semibold text-zinc-950 transition hover:bg-emerald-300 disabled:opacity-60"
+  return (
+    <div className="relative flex min-h-full flex-1 flex-col items-center justify-center overflow-hidden p-6">
+      <div className="stars" />
+      <div className="aurora opacity-70" />
+
+      {/* Living pulse orb behind the wordmark */}
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-[38%] -translate-x-1/2 -translate-y-1/2"
+        initial={{ opacity: 0, scale: 0.6 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 1.1, ease: "easeOut" }}
       >
-        {status === "locating" ? "Locating…" : "Enter Pulse"}
-      </button>
+        <div className="relative h-56 w-56">
+          <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(168,85,247,0.55),rgba(56,189,248,0.15)_55%,transparent_72%)] blur-xl" />
+          {[0, 1, 2].map((i) => (
+            <motion.span
+              key={i}
+              className="absolute inset-0 rounded-full border border-fuchsia-300/30"
+              animate={{ scale: [1, 2.1], opacity: [0.5, 0] }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                delay: i * 1,
+                ease: "easeOut",
+              }}
+            />
+          ))}
+          <div className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_0_30px_10px_rgba(56,189,248,0.7)]" />
+        </div>
+      </motion.div>
+
+      <motion.div
+        className="relative z-10 flex flex-col items-center text-center"
+        initial="hidden"
+        animate="show"
+        variants={{
+          hidden: {},
+          show: { transition: { staggerChildren: 0.12, delayChildren: 0.15 } },
+        }}
+      >
+        {[
+          <h1
+            key="title"
+            className="aurora-text text-6xl font-bold tracking-tight drop-shadow-[0_0_30px_rgba(168,85,247,0.35)] sm:text-7xl"
+          >
+            Pulse
+          </h1>,
+          <p
+            key="tag"
+            className="mt-4 max-w-md text-lg text-[color:var(--muted)]"
+          >
+            A living globe of anonymous strangers.
+            <br />
+            Find a glowing dot. Say hello.
+          </p>,
+          <div key="cta" className="mt-9">
+            <button
+              onClick={enter}
+              disabled={locating}
+              className="btn-aurora group relative inline-flex items-center gap-2.5 rounded-full px-9 py-3.5 text-base disabled:cursor-wait disabled:opacity-70"
+            >
+              <span
+                className={`inline-block h-2.5 w-2.5 rounded-full bg-current ${
+                  locating ? "animate-ping" : ""
+                }`}
+              />
+              {locating ? "Finding you…" : "Enter Pulse"}
+            </button>
+          </div>,
+        ].map((child, i) => (
+          <motion.div
+            key={i}
+            variants={{
+              hidden: { opacity: 0, y: 16 },
+              show: { opacity: 1, y: 0, transition: { ease: "easeOut" } },
+            }}
+          >
+            {child}
+          </motion.div>
+        ))}
+      </motion.div>
 
       {status === "error" && (
-        <p className="max-w-sm text-center text-sm text-red-400">{error}</p>
+        <motion.p
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative z-10 mt-6 max-w-sm rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-2.5 text-center text-sm text-red-200"
+        >
+          {error}
+        </motion.p>
       )}
 
-      <p className="max-w-sm text-center text-xs text-zinc-500">
-        No sign-up. Your dot is placed 1–3&nbsp;km from your real location.
-        Nothing is stored — closing the tab ends everything.
-      </p>
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.8 }}
+        className="relative z-10 mt-16 flex max-w-sm items-center gap-2 text-center text-xs text-[color:var(--muted)]/80"
+      >
+        <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-teal-300 shadow-[0_0_8px_2px_rgba(45,212,191,0.6)]" />
+        No sign-up. Your dot sits 1–3&nbsp;km off your real spot. Chat &amp; video
+        are peer-to-peer — nothing is stored.
+      </motion.p>
     </div>
   );
 }

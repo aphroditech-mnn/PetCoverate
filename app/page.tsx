@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import EntryGate from "./components/EntryGate";
 import WorldMap from "./components/WorldMap";
 import ConnectionPrompt from "./components/ConnectionPrompt";
@@ -332,75 +333,106 @@ export default function Home() {
         canConnect={conn.kind === "idle"}
       />
 
-      {notice && (
-        <div className="absolute left-1/2 top-20 z-30 -translate-x-1/2 rounded-full bg-zinc-800/90 px-4 py-2 text-sm text-zinc-100 shadow-lg backdrop-blur">
-          {notice}
-        </div>
-      )}
-
-      {conn.kind === "requesting" && (
-        <div className="absolute left-1/2 top-20 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full bg-zinc-800/90 px-4 py-2 text-sm text-zinc-100 shadow-lg backdrop-blur">
-          <span>Requesting connection…</span>
-          <button
-            onClick={cancelRequest}
-            className="rounded-full bg-zinc-700 px-3 py-1 text-xs hover:bg-zinc-600"
+      <AnimatePresence>
+        {notice && (
+          <motion.div
+            key="notice"
+            initial={{ opacity: 0, y: -12, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -12, scale: 0.96 }}
+            className="glass absolute left-1/2 top-20 z-30 -translate-x-1/2 rounded-full px-4 py-2 text-sm text-zinc-100"
           >
-            Cancel
-          </button>
-        </div>
-      )}
+            {notice}
+          </motion.div>
+        )}
 
-      {conn.kind === "incoming" && (
-        <ConnectionPrompt
-          title="A stranger wants to connect"
-          acceptLabel="Accept"
-          declineLabel="Decline"
-          onAccept={acceptIncoming}
-          onDecline={declineIncoming}
-        />
-      )}
+        {conn.kind === "requesting" && (
+          <motion.div
+            key="requesting"
+            initial={{ opacity: 0, y: -12, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -12, scale: 0.96 }}
+            className="glass absolute left-1/2 top-20 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full py-2 pl-4 pr-2 text-sm text-zinc-100"
+          >
+            <span className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-fuchsia-400 opacity-70" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-fuchsia-300" />
+              </span>
+              Reaching out…
+            </span>
+            <button
+              onClick={cancelRequest}
+              className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs transition hover:bg-white/10"
+            >
+              Cancel
+            </button>
+          </motion.div>
+        )}
 
-      {inChat && (
-        <ChatPanel
-          messages={messages}
-          connected={conn.kind === "connected"}
-          videoBusy={video !== "none"}
-          onSend={(text) => {
-            // Only echo locally if we actually have a peer to send to, so a
-            // message never "appears sent" after the connection dropped.
-            if (!peerRef.current) return;
-            peerRef.current.sendChat(text);
-            addMessage(true, text);
-          }}
-          onStartVideo={startVideoRequest}
-          onEnd={endConnection}
-        />
-      )}
+        {conn.kind === "incoming" && (
+          <ConnectionPrompt
+            key="incoming"
+            title="A stranger wants to connect"
+            subtitle="Accept to open a private, peer-to-peer chat."
+            acceptLabel="Accept"
+            declineLabel="Decline"
+            onAccept={acceptIncoming}
+            onDecline={declineIncoming}
+          />
+        )}
 
-      {video === "requesting" && (
-        <div className="absolute bottom-24 left-1/2 z-30 -translate-x-1/2 rounded-full bg-zinc-800/90 px-4 py-2 text-sm text-zinc-100 shadow-lg backdrop-blur">
-          Waiting for stranger to accept video…
-        </div>
-      )}
+        {inChat && (
+          <ChatPanel
+            key="chat"
+            messages={messages}
+            connected={conn.kind === "connected"}
+            videoBusy={video !== "none"}
+            onSend={(text) => {
+              // Only echo locally if we actually have a peer to send to, so a
+              // message never "appears sent" after the connection dropped.
+              if (!peerRef.current) return;
+              peerRef.current.sendChat(text);
+              addMessage(true, text);
+            }}
+            onStartVideo={startVideoRequest}
+            onEnd={endConnection}
+          />
+        )}
 
-      {video === "incoming" && (
-        <ConnectionPrompt
-          title="Start video call?"
-          subtitle="The stranger wants to turn on video."
-          acceptLabel="Accept"
-          declineLabel="Decline"
-          onAccept={acceptVideo}
-          onDecline={declineVideo}
-        />
-      )}
+        {video === "requesting" && (
+          <motion.div
+            key="vreq"
+            initial={{ opacity: 0, y: 12, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.96 }}
+            className="glass absolute bottom-24 left-1/2 z-30 -translate-x-1/2 rounded-full px-4 py-2 text-sm text-zinc-100"
+          >
+            Waiting for stranger to accept video…
+          </motion.div>
+        )}
 
-      {video === "active" && (
-        <VideoPanel
-          localStream={localStream}
-          remoteStream={remoteStream}
-          onEnd={endVideo}
-        />
-      )}
+        {video === "incoming" && (
+          <ConnectionPrompt
+            key="vincoming"
+            title="Start video call?"
+            subtitle="The stranger wants to turn on their camera."
+            acceptLabel="Accept"
+            declineLabel="Decline"
+            onAccept={acceptVideo}
+            onDecline={declineVideo}
+          />
+        )}
+
+        {video === "active" && (
+          <VideoPanel
+            key="video"
+            localStream={localStream}
+            remoteStream={remoteStream}
+            onEnd={endVideo}
+          />
+        )}
+      </AnimatePresence>
     </main>
   );
 }
