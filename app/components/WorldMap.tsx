@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import "mapbox-gl/dist/mapbox-gl.css";
 import type { Map as MapboxMap, Marker } from "mapbox-gl";
 import type { PeerDot } from "@/lib/types";
+import { vibeByKey } from "@/lib/vibes";
 
 const RAW_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 // Treat the .env.example placeholder as "no token" so dev shows a helpful hint
@@ -24,11 +25,15 @@ function dotColor(id: string): string {
 export default function WorldMap({
   peers,
   me,
+  meVibe,
+  vibeFilter,
   onPeerClick,
   canConnect,
 }: {
   peers: PeerDot[];
   me: { lat: number; lng: number } | null;
+  meVibe: string | null;
+  vibeFilter: string | null;
   onPeerClick: (id: string) => void;
   canConnect: boolean;
 }) {
@@ -104,23 +109,26 @@ export default function WorldMap({
     (async () => {
       const mapboxgl = (await import("mapbox-gl")).default;
       if (cancelled) return;
+      const emoji = vibeByKey(meVibe)?.emoji ?? "";
+      const label = `<span class="pulse-me-label">You${emoji ? ` ${emoji}` : ""}</span>`;
       if (!meMarkerRef.current) {
         const el = document.createElement("div");
         el.className = "pulse-me";
         el.title = "You are here";
-        el.innerHTML = `<span class="pulse-me-label">You</span>`;
+        el.innerHTML = label;
         meMarkerRef.current = new mapboxgl.Marker({ element: el, anchor: "center" })
           .setLngLat([me.lng, me.lat])
           .addTo(map);
       } else {
         meMarkerRef.current.setLngLat([me.lng, me.lat]);
+        meMarkerRef.current.getElement().innerHTML = label;
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [me, ready]);
+  }, [me, meVibe, ready]);
 
   // Reconcile markers whenever the peer list changes (or the map becomes ready).
   useEffect(() => {
@@ -140,8 +148,10 @@ export default function WorldMap({
         if (!marker) {
           const el = document.createElement("button");
           el.className = "pulse-dot";
-          el.style.setProperty("--dot", dotColor(peer.id));
-          el.title = "Tap to connect";
+          el.style.setProperty(
+            "--dot",
+            vibeByKey(peer.vibe)?.color ?? dotColor(peer.id),
+          );
           el.addEventListener("click", (e) => {
             e.stopPropagation();
             if (canConnectRef.current) onPeerClickRef.current(peer.id);
@@ -153,7 +163,15 @@ export default function WorldMap({
         }
         const el = marker.getElement();
         el.classList.toggle("is-busy", peer.busy);
-        el.title = peer.busy ? "In a connection" : "Tap to connect";
+        // Dim dots that don't match an active vibe filter.
+        el.classList.toggle(
+          "dimmed",
+          !!vibeFilter && peer.vibe !== vibeFilter,
+        );
+        const vibeLabel = vibeByKey(peer.vibe)?.label;
+        el.title = peer.busy
+          ? "In a connection"
+          : `Tap to connect${vibeLabel ? ` · ${vibeLabel}` : ""}`;
       }
 
       // Drop markers for peers that went offline / got filtered out.
@@ -168,7 +186,7 @@ export default function WorldMap({
     return () => {
       cancelled = true;
     };
-  }, [peers, ready]);
+  }, [peers, ready, vibeFilter]);
 
   const others = peers.length;
 

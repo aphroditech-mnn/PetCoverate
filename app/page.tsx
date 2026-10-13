@@ -7,6 +7,7 @@ import WorldMap from "./components/WorldMap";
 import ConnectionPrompt from "./components/ConnectionPrompt";
 import ChatPanel, { type ChatMessage } from "./components/ChatPanel";
 import VideoPanel from "./components/VideoPanel";
+import VibeBar from "./components/VibeBar";
 import { join, leave, poll, sendSignal, SessionExpiredError } from "@/lib/api";
 import { PeerSession, type DescType, type PeerControl } from "@/lib/webrtc";
 import { POLL_INTERVAL_MS } from "@/lib/presence";
@@ -34,6 +35,8 @@ export default function Home() {
   const [myLocation, setMyLocation] = useState<{ lat: number; lng: number } | null>(
     null,
   );
+  const [myVibe, setMyVibe] = useState<string | null>(null);
+  const [vibeFilter, setVibeFilter] = useState<string | null>(null);
 
   const [conn, _setConn] = useState<Conn>({ kind: "idle" });
   const connRef = useRef<Conn>(conn);
@@ -328,10 +331,28 @@ export default function Home() {
     };
   }, [sessionId, phase]);
 
-  async function handleReady(lat: number, lng: number) {
+  async function handleReady(lat: number, lng: number, vibe: string | null) {
     setMyLocation({ lat, lng });
-    await join(sessionId, lat, lng);
+    setMyVibe(vibe);
+    await join(sessionId, lat, lng, vibe);
     setPhase("live");
+  }
+
+  // Serendipity: connect me with a random free stranger — preferring the vibe
+  // I've spotlighted, falling back to anyone available.
+  function connectRandom() {
+    if (connRef.current.kind !== "idle") return;
+    const free = peers.filter((p) => !p.busy);
+    const matching = vibeFilter
+      ? free.filter((p) => p.vibe === vibeFilter)
+      : [];
+    const pool = matching.length > 0 ? matching : free;
+    if (pool.length === 0) {
+      showNotice("No one free to connect right now — hang tight.");
+      return;
+    }
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    requestConnection(pick.id);
   }
 
   if (phase === "gate") {
@@ -345,9 +366,38 @@ export default function Home() {
       <WorldMap
         peers={peers}
         me={myLocation}
+        meVibe={myVibe}
+        vibeFilter={vibeFilter}
         onPeerClick={requestConnection}
         canConnect={conn.kind === "idle"}
       />
+
+      {conn.kind === "idle" && (
+        <VibeBar
+          peers={peers}
+          meVibe={myVibe}
+          active={vibeFilter}
+          onSelect={setVibeFilter}
+        />
+      )}
+
+      <AnimatePresence>
+        {conn.kind === "idle" && (
+          <motion.button
+            key="surprise"
+            onClick={connectRandom}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            whileHover={{ y: -2 }}
+            whileTap={{ scale: 0.97 }}
+            className="btn-aurora absolute bottom-6 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full px-6 py-3 text-sm shadow-xl"
+          >
+            <span aria-hidden>✨</span>
+            {vibeFilter ? "Connect me with this vibe" : "Connect me with someone"}
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {notice && (

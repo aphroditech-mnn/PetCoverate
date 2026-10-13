@@ -211,6 +211,16 @@ body {
   animation: none;
 }
 
+/* Dots that don't match an active vibe filter fade back. */
+.pulse-dot.dimmed {
+  opacity: 0.16;
+  filter: saturate(0.3);
+  transition: opacity 0.3s ease, filter 0.3s ease;
+}
+.pulse-dot.dimmed::after {
+  animation: none;
+}
+
 /* The user's own beacon. */
 .pulse-me {
   position: relative;

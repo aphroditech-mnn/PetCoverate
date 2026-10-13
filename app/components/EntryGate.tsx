@@ -2,14 +2,16 @@
 
 import { useState } from "react";
 import { motion } from "motion/react";
+import { VIBES } from "@/lib/vibes";
 
 export default function EntryGate({
   onReady,
 }: {
-  onReady: (lat: number, lng: number) => void;
+  onReady: (lat: number, lng: number, vibe: string | null) => void;
 }) {
   const [status, setStatus] = useState<"idle" | "locating" | "error">("idle");
   const [error, setError] = useState<string>("");
+  const [vibe, setVibe] = useState<string | null>(null);
 
   function enter() {
     if (!("geolocation" in navigator)) {
@@ -19,7 +21,7 @@ export default function EntryGate({
     }
     setStatus("locating");
     navigator.geolocation.getCurrentPosition(
-      (pos) => onReady(pos.coords.latitude, pos.coords.longitude),
+      (pos) => onReady(pos.coords.latitude, pos.coords.longitude, vibe),
       (err) => {
         setStatus("error");
         setError(
@@ -44,7 +46,7 @@ export default function EntryGate({
       {/* Living pulse orb behind the wordmark */}
       <motion.div
         aria-hidden
-        className="pointer-events-none absolute left-1/2 top-[38%] -translate-x-1/2 -translate-y-1/2"
+        className="pointer-events-none absolute left-1/2 top-[30%] -translate-x-1/2 -translate-y-1/2"
         initial={{ opacity: 0, scale: 0.6 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 1.1, ease: "easeOut" }}
@@ -69,7 +71,7 @@ export default function EntryGate({
       </motion.div>
 
       <motion.div
-        className="relative z-10 flex flex-col items-center text-center"
+        className="relative z-10 flex w-full max-w-lg flex-col items-center text-center"
         initial="hidden"
         animate="show"
         variants={{
@@ -77,22 +79,59 @@ export default function EntryGate({
           show: { transition: { staggerChildren: 0.12, delayChildren: 0.15 } },
         }}
       >
-        {[
-          <h1
-            key="title"
-            className="aurora-text text-6xl font-bold tracking-tight drop-shadow-[0_0_30px_rgba(168,85,247,0.35)] sm:text-7xl"
-          >
+        <Stagger>
+          <h1 className="aurora-text text-6xl font-bold tracking-tight drop-shadow-[0_0_30px_rgba(168,85,247,0.35)] sm:text-7xl">
             Pulse
-          </h1>,
-          <p
-            key="tag"
-            className="mt-4 max-w-md text-lg text-[color:var(--muted)]"
-          >
+          </h1>
+        </Stagger>
+        <Stagger>
+          <p className="mt-4 max-w-md text-lg text-[color:var(--muted)]">
             A living globe of anonymous strangers.
             <br />
             Find a glowing dot. Say hello.
-          </p>,
-          <div key="cta" className="mt-9">
+          </p>
+        </Stagger>
+
+        {/* Vibe picker */}
+        <Stagger>
+          <div className="mt-8 w-full">
+            <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-[color:var(--muted)]/80">
+              Pick a vibe · optional
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {VIBES.map((v) => {
+                const active = vibe === v.key;
+                return (
+                  <button
+                    key={v.key}
+                    type="button"
+                    onClick={() => setVibe(active ? null : v.key)}
+                    style={
+                      active
+                        ? {
+                            borderColor: v.color,
+                            boxShadow: `0 0 18px -4px ${v.color}`,
+                            background: `${v.color}1f`,
+                          }
+                        : undefined
+                    }
+                    className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm transition ${
+                      active
+                        ? "text-white"
+                        : "border-white/10 bg-white/5 text-zinc-300 hover:border-white/25 hover:bg-white/10"
+                    }`}
+                  >
+                    <span>{v.emoji}</span>
+                    {v.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </Stagger>
+
+        <Stagger>
+          <div className="mt-9">
             <button
               onClick={enter}
               disabled={locating}
@@ -105,18 +144,8 @@ export default function EntryGate({
               />
               {locating ? "Finding you…" : "Enter Pulse"}
             </button>
-          </div>,
-        ].map((child, i) => (
-          <motion.div
-            key={i}
-            variants={{
-              hidden: { opacity: 0, y: 16 },
-              show: { opacity: 1, y: 0, transition: { ease: "easeOut" } },
-            }}
-          >
-            {child}
-          </motion.div>
-        ))}
+          </div>
+        </Stagger>
       </motion.div>
 
       {status === "error" && (
@@ -133,12 +162,25 @@ export default function EntryGate({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.8 }}
-        className="relative z-10 mt-16 flex max-w-sm items-center gap-2 text-center text-xs text-[color:var(--muted)]/80"
+        className="relative z-10 mt-14 flex max-w-sm items-center gap-2 text-center text-xs text-[color:var(--muted)]/80"
       >
         <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-teal-300 shadow-[0_0_8px_2px_rgba(45,212,191,0.6)]" />
         No sign-up. Your dot sits 1–3&nbsp;km off your real spot. Chat &amp; video
         are peer-to-peer — nothing is stored.
       </motion.p>
     </div>
+  );
+}
+
+function Stagger({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.div
+      variants={{
+        hidden: { opacity: 0, y: 16 },
+        show: { opacity: 1, y: 0, transition: { ease: "easeOut" } },
+      }}
+    >
+      {children}
+    </motion.div>
   );
 }
