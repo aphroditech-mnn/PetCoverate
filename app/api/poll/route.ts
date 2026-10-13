@@ -21,9 +21,11 @@ export async function GET(request: NextRequest) {
   const staleCutoff = new Date(now - STALE_MS);
   const signalCutoff = new Date(now - SIGNAL_TTL_MS);
 
-  // 1) Heartbeat — refresh lastSeen for the caller.
+  // 1) Heartbeat — refresh lastSeen for the caller only. (Using `where: {}`
+  // here would refresh EVERY row on every poll, so no dot would ever go stale
+  // while anyone is online — the "ghost dots that never leave" bug.)
   await prisma.presence.updateMany({
-    where: {},
+    where: { id },
     data: { lastSeen: new Date(now) },
   });
 
