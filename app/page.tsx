@@ -7,7 +7,7 @@ import WorldMap from "./components/WorldMap";
 import ConnectionPrompt from "./components/ConnectionPrompt";
 import ChatPanel, { type ChatMessage } from "./components/ChatPanel";
 import VideoPanel from "./components/VideoPanel";
-import { join, leave, poll, sendSignal } from "@/lib/api";
+import { join, leave, poll, sendSignal, SessionExpiredError } from "@/lib/api";
 import { PeerSession, type DescType, type PeerControl } from "@/lib/webrtc";
 import { POLL_INTERVAL_MS } from "@/lib/presence";
 import { type PeerDot, type SignalMsg } from "@/lib/types";
@@ -52,6 +52,10 @@ export default function Home() {
   const peerRef = useRef<PeerSession | null>(null);
   const msgId = useRef(0);
   const requestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const locationRef = useRef(myLocation);
+  useEffect(() => {
+    locationRef.current = myLocation;
+  }, [myLocation]);
 
   function showNotice(text: string) {
     setNotice(text);
@@ -281,11 +285,23 @@ export default function Home() {
 
     const tick = async () => {
       try {
-        const data = await poll(sessionId);
+        const data = await poll();
         if (!active) return;
         setPeers(data.peers);
         for (const s of data.signals) processSignalRef.current(s);
-      } catch {}
+      } catch (err) {
+        // Session lapsed (e.g. tab slept past the stale window) — re-join with
+        // our last known location to re-establish presence + cookie.
+        if (err instanceof SessionExpiredError && locationRef.current) {
+          try {
+            await join(
+              sessionId,
+              locationRef.current.lat,
+              locationRef.current.lng,
+            );
+          } catch {}
+        }
+      }
       if (active) timer = setTimeout(tick, POLL_INTERVAL_MS);
     };
     tick();

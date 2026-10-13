@@ -13,10 +13,19 @@ export async function join(
   });
 }
 
-export async function poll(id: string): Promise<PollResponse> {
-  const res = await fetch(`/api/poll?id=${encodeURIComponent(id)}`, {
-    cache: "no-store",
-  });
+// Identity comes from the session cookie, so we don't put the id in the URL
+// (keeps it out of history/proxy logs). A 401 means our session lapsed (e.g. the
+// tab slept past the stale window) — surface it so the caller can re-join.
+export class SessionExpiredError extends Error {
+  constructor() {
+    super("session expired");
+    this.name = "SessionExpiredError";
+  }
+}
+
+export async function poll(): Promise<PollResponse> {
+  const res = await fetch("/api/poll", { cache: "no-store" });
+  if (res.status === 401) throw new SessionExpiredError();
   if (!res.ok) throw new Error(`poll failed: ${res.status}`);
   return res.json();
 }
