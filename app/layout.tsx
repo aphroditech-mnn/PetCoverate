@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -13,8 +13,16 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Pulse",
-  description: "A living globe of anonymous strangers. Tap a dot, start talking.",
+  title: "Pulse — a living globe of strangers",
+  description:
+    "A living globe of anonymous strangers. Tap a glowing dot and start talking — peer-to-peer, nothing stored.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#04050c",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({
@@ -27,7 +35,7 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col overflow-hidden">{children}</body>
     </html>
   );
 }
