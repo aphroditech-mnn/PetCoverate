@@ -12,11 +12,15 @@ datasource db {
 }
 
 model Presence {
-  id       String   @id // client-generated session uuid
-  lat      Float // ALREADY privacy-offset coords (raw is never stored)
-  lng      Float
-  busy     Boolean  @default(false) // true while in an active connection
-  lastSeen DateTime
+  id        String   @id // client-generated session uuid (public map handle)
+  lat       Float // ALREADY privacy-offset coords (raw is never stored)
+  lng       Float
+  busy      Boolean  @default(false) // true while in an active connection
+  lastSeen  DateTime
+  // sha-256 of the per-session secret handed to the browser in an httpOnly
+  // cookie. Proves a caller actually owns this id (no accounts, but no
+  // impersonation either). Dies with the row — nothing durable.
+  tokenHash String?
 
   @@index([lastSeen])
 }
