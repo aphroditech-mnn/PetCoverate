@@ -5,14 +5,20 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import type { Map as MapboxMap, Marker } from "mapbox-gl";
 import type { PeerDot } from "@/lib/types";
 
-const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "pk.eyJ1IjoicHVsc2UtbWFwIiwiYSI6ImNrMDBkZW1vMDAwMDAwMDAifQ.AAAAAAAAAAAAAAAAAAAAAA";
+const RAW_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
+// Treat the .env.example placeholder as "no token" so dev shows a helpful hint
+// instead of a silently-broken globe.
+const TOKEN =
+  RAW_TOKEN.startsWith("pk.") && !RAW_TOKEN.includes("your_mapbox_token")
+    ? RAW_TOKEN
+    : "";
 
 function dotColor(id: string): string {
   let hash = 0;
   for (let i = 0; i < id.length; i++) {
     hash = (hash * 31 + id.charCodeAt(i)) | 0;
   }
-  return `hsl(${Math.abs(hash) % 360}, 70%, 60%)`;
+  return `hsl(${Math.abs(hash) % 360}, 85%, 68%)`;
 }
 
 export default function WorldMap({
@@ -54,10 +60,20 @@ export default function WorldMap({
       const map = new mapboxgl.Map({
         container: containerRef.current,
         style: "mapbox://styles/mapbox/dark-v11",
-        // Open centered on the user if we know where they are, else world view.
+        projection: "globe", // true 3D globe — the "living globe" centrepiece
         center: me ? [me.lng, me.lat] : [0, 20],
-        zoom: me ? 4 : 1.4,
+        zoom: me ? 3.2 : 1.6,
         attributionControl: true,
+      });
+      map.on("style.load", () => {
+        // Space atmosphere: deep void + a soft indigo horizon glow + stars.
+        map.setFog({
+          color: "rgb(14, 17, 38)",
+          "high-color": "rgb(60, 70, 160)",
+          "horizon-blend": 0.08,
+          "space-color": "rgb(4, 5, 12)",
+          "star-intensity": 0.5,
+        });
       });
       map.on("load", () => {
         if (!cancelled) setReady(true);
@@ -79,7 +95,7 @@ export default function WorldMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Show / move the user's own "you are here" pin.
+  // Show / move the user's own "you are here" beacon.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready || !me) return;
@@ -92,9 +108,8 @@ export default function WorldMap({
         const el = document.createElement("div");
         el.className = "pulse-me";
         el.title = "You are here";
-        el.innerHTML = `<span class="pulse-me-label">Me</span>📍`;
-        // anchor "bottom" → the pin's tip sits on the exact coordinate.
-        meMarkerRef.current = new mapboxgl.Marker({ element: el, anchor: "bottom" })
+        el.innerHTML = `<span class="pulse-me-label">You</span>`;
+        meMarkerRef.current = new mapboxgl.Marker({ element: el, anchor: "center" })
           .setLngLat([me.lng, me.lat])
           .addTo(map);
       } else {
@@ -125,7 +140,7 @@ export default function WorldMap({
         if (!marker) {
           const el = document.createElement("button");
           el.className = "pulse-dot";
-          el.style.background = dotColor(peer.id);
+          el.style.setProperty("--dot", dotColor(peer.id));
           el.title = "Tap to connect";
           el.addEventListener("click", (e) => {
             e.stopPropagation();
@@ -136,7 +151,9 @@ export default function WorldMap({
             .addTo(map);
           markers.set(peer.id, marker);
         }
-        marker.getElement().style.opacity = peer.busy ? "0.35" : "1";
+        const el = marker.getElement();
+        el.classList.toggle("is-busy", peer.busy);
+        el.title = peer.busy ? "In a connection" : "Tap to connect";
       }
 
       // Drop markers for peers that went offline / got filtered out.
@@ -153,23 +170,48 @@ export default function WorldMap({
     };
   }, [peers, ready]);
 
+  const others = peers.length;
+
   return (
     <div className="absolute inset-0">
-      <div ref={containerRef} className="h-full w-full bg-zinc-900" />
+      <div ref={containerRef} className="h-full w-full bg-[#04050c]" />
+
+      {/* Atmospheric vignette + aurora rim over the map. */}
+      {TOKEN && <div className="map-atmosphere" />}
 
       {!TOKEN && (
         <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
-          <p className="max-w-md rounded-lg bg-zinc-800 p-4 text-sm text-zinc-200">
-            Set{" "}
-            <code className="text-emerald-400">NEXT_PUBLIC_MAPBOX_TOKEN</code> in{" "}
-            <code>.env</code> to load the map.
-          </p>
+          <div className="stars" />
+          <div className="aurora opacity-60" />
+          <div className="glass relative z-10 max-w-md rounded-2xl p-6 text-sm text-zinc-200">
+            <p className="aurora-text mb-2 text-lg font-semibold">Almost there</p>
+            <p>
+              Set{" "}
+              <code className="rounded bg-white/10 px-1.5 py-0.5 text-teal-300">
+                NEXT_PUBLIC_MAPBOX_TOKEN
+              </code>{" "}
+              in <code className="rounded bg-white/10 px-1.5 py-0.5">.env</code> to
+              load the globe.
+            </p>
+          </div>
         </div>
       )}
 
-      {/* Online count */}
-      <div className="absolute bottom-4 left-4 rounded-full bg-zinc-900/80 px-3 py-1.5 text-xs text-zinc-300 backdrop-blur">
-        {peers.length} online
+      {/* Brand chip */}
+      <div className="pointer-events-none absolute left-4 top-4 z-20 flex items-center gap-2">
+        <span className="aurora-text text-lg font-bold tracking-tight">Pulse</span>
+      </div>
+
+      {/* Live online count */}
+      <div className="absolute bottom-5 left-4 z-20 flex items-center gap-2 rounded-full border border-white/10 bg-[rgba(10,13,30,0.6)] px-3.5 py-1.5 text-xs text-zinc-200 backdrop-blur-md">
+        <span className="relative flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-teal-400 opacity-70" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-teal-300" />
+        </span>
+        <span className="font-medium text-white">{others}</span>
+        <span className="text-zinc-400">
+          {others === 1 ? "stranger" : "strangers"} online
+        </span>
       </div>
     </div>
   );
