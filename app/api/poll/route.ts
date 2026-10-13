@@ -2,45 +2,52 @@ import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { STALE_MS, SIGNAL_TTL_MS } from "@/lib/presence";
 import type { PollResponse } from "@/lib/types";
+import { authenticate } from "@/lib/session";
+import { rateLimit, clientIp } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// GET /api/poll?id= — the single endpoint that drives the live map.
-// It (1) heartbeats the caller, (2) reaps stale presence + orphan signals,
-// (3) returns the filtered online peers, and (4) drains this user's mailbox.
-export async function GET(request: NextRequest) {
-  const params = request.nextUrl.searchParams;
-  const id = params.get("id");
+// A single poll must never ship the entire planet's dots in one response.
+const MAX_PEERS = 2000;
 
+// GET /api/poll — the single endpoint that drives the live map. Identity comes
+// from the session cookie (not a query param), so a caller can only heartbeat
+// and drain their OWN mailbox. It (1) heartbeats the caller, (2) reaps stale
+// presence + orphan signals, (3) returns the online peers, (4) drains this
+// user's mailbox.
+export async function GET(request: NextRequest) {
+  if (!rateLimit(`poll:${clientIp(request)}`, 150, 60_000)) {
+    return Response.json({ error: "rate limited" }, { status: 429 });
+  }
+
+  const id = await authenticate(request);
   if (!id) {
-    return Response.json({ error: "missing id" }, { status: 400 });
+    return Response.json({ error: "unauthorized" }, { status: 401 });
   }
 
   const now = Date.now();
   const staleCutoff = new Date(now - STALE_MS);
   const signalCutoff = new Date(now - SIGNAL_TTL_MS);
 
-  // 1) Heartbeat — refresh lastSeen for the caller only. (Using `where: {}`
-  // here would refresh EVERY row on every poll, so no dot would ever go stale
-  // while anyone is online — the "ghost dots that never leave" bug.)
+  // 1) Heartbeat — refresh lastSeen for the caller only.
   await prisma.presence.updateMany({
     where: { id },
     data: { lastSeen: new Date(now) },
   });
 
-  // 2) Reap stale presence rows and orphaned signals (independent deletes —
-  // no atomicity needed, and avoids transactions over a PgBouncer pooler).
+  // 2) Reap stale presence rows and orphaned signals.
   await prisma.presence.deleteMany({ where: { lastSeen: { lt: staleCutoff } } });
   await prisma.signal.deleteMany({ where: { createdAt: { lt: signalCutoff } } });
 
-  // 3) Online peers, excluding self.
+  // 3) Online peers, excluding self (capped).
   const peers = await prisma.presence.findMany({
     where: {
       id: { not: id },
       lastSeen: { gte: staleCutoff },
     },
     select: { id: true, lat: true, lng: true, busy: true },
+    take: MAX_PEERS,
   });
 
   // 4) Drain this user's mailbox: read, then delete exactly what we read so a

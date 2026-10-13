@@ -1,6 +1,9 @@
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { SignalType } from "@/lib/types";
+import { isValidId, isValidSignalPayload } from "@/lib/validate";
+import { authenticate } from "@/lib/session";
+import { rateLimit, clientIp } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,12 +18,24 @@ const VALID_TYPES: SignalType[] = [
   "end",
 ];
 
-const MAX_PAYLOAD = 64 * 1024; // SDP/ICE are small; cap to be safe.
+// Cap how many pending messages one recipient can hold, so nobody can flood a
+// victim's mailbox. A real session holds only a handful at a time.
+const MAILBOX_CAP = 128;
 
 // POST /api/signal — body { fromId, toId, type, payload? }
-// Drops one message into the recipient's mailbox. Also manages the `busy`
-// flag so a user can only be in one connection at a time.
+// Drops one message into the recipient's mailbox and manages the `busy` flag.
+// The sender must prove (via session cookie) that it actually owns fromId, so
+// nobody can impersonate, hijack a negotiation, or poison another user's state.
 export async function POST(request: NextRequest) {
+  if (!rateLimit(`signal:${clientIp(request)}`, 300, 60_000)) {
+    return Response.json({ error: "rate limited" }, { status: 429 });
+  }
+
+  const me = await authenticate(request);
+  if (!me) {
+    return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
+
   let body: unknown;
   try {
     body = await request.json();
@@ -33,39 +48,48 @@ export async function POST(request: NextRequest) {
     unknown
   >;
 
-  if (typeof fromId !== "string" || typeof toId !== "string") {
+  if (!isValidId(fromId) || !isValidId(toId)) {
     return Response.json({ error: "invalid ids" }, { status: 400 });
+  }
+  // You may only send as yourself.
+  if (fromId !== me) {
+    return Response.json({ error: "forbidden" }, { status: 403 });
+  }
+  if (toId === me) {
+    return Response.json({ error: "cannot signal self" }, { status: 400 });
   }
   if (typeof type !== "string" || !VALID_TYPES.includes(type as SignalType)) {
     return Response.json({ error: "invalid type" }, { status: 400 });
   }
-  if (
-    payload !== undefined &&
-    payload !== null &&
-    (typeof payload !== "string" || payload.length > MAX_PAYLOAD)
-  ) {
-    return Response.json({ error: "invalid payload" }, { status: 400 });
-  }
 
   const signalType = type as SignalType;
+  if (!isValidSignalPayload(signalType, payload)) {
+    return Response.json({ error: "invalid payload" }, { status: 400 });
+  }
   const payloadStr = typeof payload === "string" ? payload : null;
 
-  // Enforce "one active connection at a time": if the target is already busy,
-  // auto-decline the request instead of delivering it.
+  // The target must be a real, online user.
+  const target = await prisma.presence.findUnique({
+    where: { id: toId },
+    select: { busy: true },
+  });
+
   if (signalType === "request") {
-    const target = await prisma.presence.findUnique({
-      where: { id: toId },
-      select: { busy: true },
-    });
-    if (!target) {
-      // Target went offline — tell the initiator it was declined.
+    // Enforce "one active connection at a time": if the target is gone or busy,
+    // auto-decline instead of delivering.
+    if (!target || target.busy) {
       await sendDecline(toId, fromId);
       return Response.json({ ok: true, autoDeclined: true });
     }
-    if (target.busy) {
-      await sendDecline(toId, fromId);
-      return Response.json({ ok: true, autoDeclined: true });
-    }
+  } else if (!target) {
+    // Peer vanished mid-handshake — nothing to deliver, and don't leave orphans.
+    return Response.json({ ok: true, delivered: false });
+  }
+
+  // Anti-flood: refuse to pile onto a full mailbox.
+  const pending = await prisma.signal.count({ where: { toId } });
+  if (pending >= MAILBOX_CAP) {
+    return Response.json({ error: "recipient mailbox full" }, { status: 429 });
   }
 
   // Busy transitions:
@@ -77,9 +101,6 @@ export async function POST(request: NextRequest) {
       data: { busy: true },
     });
   } else if (signalType === "decline" || signalType === "end") {
-    // Both decline AND end free the two peers. Omitting "end" (as the original
-    // did) left both users stuck busy=true after any hang-up, so neither could
-    // start a new connection until their presence row went stale.
     await prisma.presence.updateMany({
       where: { id: { in: [fromId, toId] } },
       data: { busy: false },
@@ -96,6 +117,11 @@ export async function POST(request: NextRequest) {
 // Helper: deliver an auto-decline from `target` back to `initiator`.
 async function sendDecline(targetId: string, initiatorId: string) {
   await prisma.signal.create({
-    data: { fromId: targetId, toId: initiatorId, type: "decline", payload: null },
+    data: {
+      fromId: targetId,
+      toId: initiatorId,
+      type: "decline",
+      payload: null,
+    },
   });
 }
