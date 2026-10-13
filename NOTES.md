@@ -120,6 +120,12 @@ the top tier and hardened the rest.
   scale/enumeration safety valves.
 - **`accept` isn't atomic** server-side; the client state machine + auth make it
   low-risk. A DB-level one-connection constraint would close it fully.
+- **Session-id collision.** A peer you've connected to learns your id, and
+  `join` upserts by id, so they could re-`join` as you and invalidate your
+  session. They still *can't act as you* (the cookie, not the id, is the
+  credential), so it's a transient self-healing DoS — the victim just 401s and
+  auto-rejoins. Rate limiting + the 15 s reap bound it; a create-only guard would
+  close it but risks locking out the legitimate reconnect path, so I left it.
 - **CSP** is deferred — a correct policy needs careful allow-listing for Mapbox
   GL's workers/blobs and tile hosts. I added the cheap headers now
   (`X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`,
