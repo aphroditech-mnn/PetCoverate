@@ -74,8 +74,11 @@ export class PeerSession {
   private wireDataChannel(dc: RTCDataChannel) {
     dc.onopen = () => this.cb.onChannelOpen();
     dc.onmessage = (e) => {
+      // The data channel can deliver binary (ArrayBuffer/Blob) too; we only
+      // speak JSON strings, so ignore anything else instead of throwing.
+      if (typeof e.data !== "string") return;
       try {
-        const msg = JSON.parse(e.data as string);
+        const msg = JSON.parse(e.data);
         if (msg.t === "chat" && typeof msg.text === "string") {
           this.cb.onChat(msg.text);
         } else if (msg.t === "ctrl" && typeof msg.ctrl === "string") {
@@ -87,15 +90,24 @@ export class PeerSession {
 
   async handleSignal(type: DescType, payload: string) {
     if (this.closed) return;
-    const data = JSON.parse(payload);
+
+    // Payload is attacker-reachable (and may be null → ""), so a bad parse must
+    // not become an unhandled rejection that wedges the connection.
+    let data: unknown;
+    try {
+      data = JSON.parse(payload);
+    } catch {
+      return;
+    }
+    if (data === null || typeof data !== "object") return;
 
     if (type === "ice") {
       if (!this.pc.remoteDescription) {
-        this.pendingCandidates.push(data);
+        this.pendingCandidates.push(data as RTCIceCandidateInit);
         return;
       }
       try {
-        await this.pc.addIceCandidate(data);
+        await this.pc.addIceCandidate(data as RTCIceCandidateInit);
       } catch {}
       return;
     }
@@ -107,13 +119,20 @@ export class PeerSession {
     this.ignoreOffer = !this.polite && offerCollision;
     if (this.ignoreOffer) return;
 
-    await this.flushPendingCandidates();
-    await this.pc.setRemoteDescription(desc);
-    if (desc.type === "offer") {
-      await this.pc.setLocalDescription();
-      if (this.pc.localDescription) {
-        this.cb.onSignal("answer", JSON.stringify(this.pc.localDescription));
+    try {
+      await this.flushPendingCandidates();
+      if (this.closed) return;
+      await this.pc.setRemoteDescription(desc);
+      if (this.closed) return;
+      if (desc.type === "offer") {
+        await this.pc.setLocalDescription();
+        if (this.pc.localDescription) {
+          this.cb.onSignal("answer", JSON.stringify(this.pc.localDescription));
+        }
       }
+    } catch {
+      // Renegotiation failed (e.g. closed mid-flight / rolled-back state). The
+      // connectionstatechange handler drives teardown if this is terminal.
     }
   }
 
@@ -129,7 +148,9 @@ export class PeerSession {
   }
 
   sendChat(text: string) {
-    this.safeSend({ t: "msg", text });
+    // NOTE: the receiver's onmessage handler matches on `t === "chat"`, so this
+    // tag must be "chat" — sending "msg" silently drops every message.
+    this.safeSend({ t: "chat", text });
   }
 
   sendControl(ctrl: PeerControl) {
