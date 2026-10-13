@@ -34,9 +34,11 @@ export async function sendSignal(
   });
 }
 
-// Fire-and-forget leave that survives the tab closing.
-export function leave(id: string): void {
-  const body = JSON.stringify({ id });
+// Fire-and-forget leave that survives the tab closing. When the user is mid-
+// connection we pass the peer id so the server can free the peer and tell them
+// the stranger is gone (otherwise the peer sits "busy" until it goes stale).
+export function leave(id: string, peerId?: string): void {
+  const body = JSON.stringify(peerId ? { id, peerId } : { id });
   if (typeof navigator !== "undefined" && navigator.sendBeacon) {
     navigator.sendBeacon("/api/leave", body);
   } else {

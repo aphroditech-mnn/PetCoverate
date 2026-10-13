@@ -76,7 +76,10 @@ export async function POST(request: NextRequest) {
       where: { id: { in: [fromId, toId] } },
       data: { busy: true },
     });
-  } else if (signalType === "decline") {
+  } else if (signalType === "decline" || signalType === "end") {
+    // Both decline AND end free the two peers. Omitting "end" (as the original
+    // did) left both users stuck busy=true after any hang-up, so neither could
+    // start a new connection until their presence row went stale.
     await prisma.presence.updateMany({
       where: { id: { in: [fromId, toId] } },
       data: { busy: false },

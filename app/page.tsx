@@ -83,6 +83,9 @@ export default function Home() {
       onRemoteStream: (stream) => setRemoteStream(stream),
       onConnectionState: (state) => {
         if (state === "failed") {
+          // Tell the peer so the server frees both busy flags; otherwise a
+          // network drop leaves us stuck "busy" until the stale timeout.
+          void sendSignal(sessionId, peerId, "end");
           teardown("Connection failed (network).");
         }
       },
@@ -294,7 +297,12 @@ export default function Home() {
 
   useEffect(() => {
     if (!sessionId || phase !== "live") return;
-    const onLeave = () => leave(sessionId);
+    const onLeave = () => {
+      const c = connRef.current;
+      const peerId =
+        c.kind === "connecting" || c.kind === "connected" ? c.peerId : undefined;
+      leave(sessionId, peerId);
+    };
     window.addEventListener("pagehide", onLeave);
     window.addEventListener("beforeunload", onLeave);
     return () => {
@@ -358,7 +366,10 @@ export default function Home() {
           connected={conn.kind === "connected"}
           videoBusy={video !== "none"}
           onSend={(text) => {
-            peerRef.current?.sendChat(text);
+            // Only echo locally if we actually have a peer to send to, so a
+            // message never "appears sent" after the connection dropped.
+            if (!peerRef.current) return;
+            peerRef.current.sendChat(text);
             addMessage(true, text);
           }}
           onStartVideo={startVideoRequest}
