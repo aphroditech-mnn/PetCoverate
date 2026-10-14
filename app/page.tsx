@@ -388,19 +388,25 @@ export default function Home() {
 
       <AnimatePresence>
         {conn.kind === "idle" && (
-          <motion.button
+          <motion.div
             key="surprise"
-            onClick={connectRandom}
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 16 }}
-            whileHover={{ y: -2 }}
-            whileTap={{ scale: 0.97 }}
-            className="btn-aurora absolute bottom-6 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full px-6 py-3 text-sm shadow-xl"
+            className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center px-4"
           >
-            <span aria-hidden>✨</span>
-            {vibeFilter ? "Connect me with this vibe" : "Connect me with someone"}
-          </motion.button>
+            <motion.button
+              onClick={connectRandom}
+              whileHover={{ y: -2 }}
+              whileTap={{ scale: 0.97 }}
+              className="btn-aurora pointer-events-auto flex items-center gap-2 rounded-full px-6 py-3 text-sm shadow-xl"
+            >
+              <span aria-hidden>✨</span>
+              {vibeFilter
+                ? "Connect me with this vibe"
+                : "Connect me with someone"}
+            </motion.button>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -408,10 +414,10 @@ export default function Home() {
         {notice && (
           <motion.div
             key="notice"
-            initial={{ opacity: 0, y: -12, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -12, scale: 0.96 }}
-            className="glass absolute left-1/2 top-20 z-30 -translate-x-1/2 rounded-full px-4 py-2 text-sm text-zinc-100"
+            initial={{ opacity: 0, x: "-50%", y: -12, scale: 0.96 }}
+            animate={{ opacity: 1, x: "-50%", y: 0, scale: 1 }}
+            exit={{ opacity: 0, x: "-50%", y: -12, scale: 0.96 }}
+            className="glass absolute left-1/2 top-20 z-30 rounded-full px-4 py-2 text-sm text-zinc-100"
           >
             {notice}
           </motion.div>
@@ -420,10 +426,10 @@ export default function Home() {
         {conn.kind === "requesting" && (
           <motion.div
             key="requesting"
-            initial={{ opacity: 0, y: -12, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -12, scale: 0.96 }}
-            className="glass absolute left-1/2 top-20 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full py-2 pl-4 pr-2 text-sm text-zinc-100"
+            initial={{ opacity: 0, x: "-50%", y: -12, scale: 0.96 }}
+            animate={{ opacity: 1, x: "-50%", y: 0, scale: 1 }}
+            exit={{ opacity: 0, x: "-50%", y: -12, scale: 0.96 }}
+            className="glass absolute left-1/2 top-20 z-30 flex items-center gap-3 rounded-full py-2 pl-4 pr-2 text-sm text-zinc-100"
           >
             <span className="flex items-center gap-2">
               <span className="relative flex h-2 w-2">
@@ -474,10 +480,10 @@ export default function Home() {
         {video === "requesting" && (
           <motion.div
             key="vreq"
-            initial={{ opacity: 0, y: 12, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 12, scale: 0.96 }}
-            className="glass absolute bottom-24 left-1/2 z-30 -translate-x-1/2 rounded-full px-4 py-2 text-sm text-zinc-100"
+            initial={{ opacity: 0, x: "-50%", y: 12, scale: 0.96 }}
+            animate={{ opacity: 1, x: "-50%", y: 0, scale: 1 }}
+            exit={{ opacity: 0, x: "-50%", y: 12, scale: 0.96 }}
+            className="glass absolute bottom-24 left-1/2 z-30 rounded-full px-4 py-2 text-sm text-zinc-100"
           >
             Waiting for stranger to accept video…
           </motion.div>

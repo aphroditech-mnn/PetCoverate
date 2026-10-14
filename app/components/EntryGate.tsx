@@ -66,7 +66,6 @@ export default function EntryGate({
               }}
             />
           ))}
-          <div className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_0_30px_10px_rgba(56,189,248,0.7)]" />
         </div>
       </motion.div>
 
@@ -162,9 +161,9 @@ export default function EntryGate({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.8 }}
-        className="relative z-10 mt-14 flex max-w-sm items-center gap-2 text-center text-xs text-[color:var(--muted)]/80"
+        className="relative z-10 mt-14 max-w-sm text-center text-xs leading-relaxed text-[color:var(--muted)]/80"
       >
-        <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-teal-300 shadow-[0_0_8px_2px_rgba(45,212,191,0.6)]" />
+        <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-teal-300 align-middle shadow-[0_0_8px_2px_rgba(45,212,191,0.6)]" />
         No sign-up. Your dot sits 1–3&nbsp;km off your real spot. Chat &amp; video
         are peer-to-peer — nothing is stored.
       </motion.p>

@@ -149,9 +149,11 @@ body {
   color: transparent;
 }
 
-/* Primary action: aurora fill with glow. */
+/* Primary action: aurora fill with glow.
+   NOTE: deliberately no `position` here — this is an unlayered rule, so a
+   `position` would beat Tailwind's layered position utilities (e.g. `absolute`)
+   wherever this class is combined with them. */
 .btn-aurora {
-  position: relative;
   background: linear-gradient(100deg, var(--aurora-indigo), var(--aurora-fuchsia) 55%, var(--aurora-teal));
   background-size: 200% 100%;
   color: #0a0a14;
